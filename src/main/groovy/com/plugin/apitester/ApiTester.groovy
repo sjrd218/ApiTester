@@ -1,9 +1,14 @@
 package com.plugin.apitester;
 
-import com.dtolabs.rundeck.core.common.INodeEntry;
+import com.dtolabs.rundeck.core.common.INodeEntry
+import com.dtolabs.rundeck.core.data.SharedDataContextUtils
+import com.dtolabs.rundeck.core.dispatcher.ContextView
+import com.dtolabs.rundeck.core.dispatcher.DataContextUtils
+import com.dtolabs.rundeck.core.execution.workflow.WFSharedContext;
 import com.dtolabs.rundeck.core.execution.workflow.steps.FailureReason;
 import com.dtolabs.rundeck.core.execution.workflow.steps.node.NodeStepException;
 import com.dtolabs.rundeck.core.plugins.Plugin
+import com.dtolabs.rundeck.core.plugins.configuration.PropertyScope
 import com.dtolabs.rundeck.plugins.ServiceNameConstants;
 import com.dtolabs.rundeck.plugins.descriptions.PluginDescription
 import com.dtolabs.rundeck.plugins.descriptions.PluginProperty
@@ -33,45 +38,45 @@ public class ApiTester implements NodeStepPlugin {
 
     public static final String SERVICE_PROVIDER_NAME = "api-tester";
 
-    @PluginProperty(title="Endpoint",description = "The http(s) endpoint to hit")
+    @PluginProperty(title="Endpoint",description = "The http(s) endpoint to hit", scope = PropertyScope.Instance)
     String endpoint
 
-    @PluginProperty(title="Http Method",description = "The method to use for the request", defaultValue = "GET")
+    @PluginProperty(title="Http Method",description = "The method to use for the request", defaultValue = "GET", scope = PropertyScope.Instance)
     @SelectValues(values=["GET","POST","PUT","PATCH","HEAD","OPTIONS","DELETE"])
     String method
 
-    @PluginProperty(title="Request Payload",description = "Request Payload")
+    @PluginProperty(title="Request Payload",description = "Request Payload", scope = PropertyScope.Instance)
     @TextArea
     String requestPayload
 
-    @PluginProperty(title="Request Payload Content Type",description = "If sending a request payload, this specifies the payload mime type.")
+    @PluginProperty(title="Request Payload Content Type",description = "If sending a request payload, this specifies the payload mime type.", scope = PropertyScope.Instance)
     String requestContentType
 
-    @PluginProperty(title="Request Headers",description = "Request headers")
+    @PluginProperty(title="Request Headers",description = "Request headers", scope = PropertyScope.Instance)
     @TextArea
     String requestHeaders
 
-    @PluginProperty(title="Bypass Response Content Check", description = "Allows bypassing the response content check", defaultValue = "false")
+    @PluginProperty(title="Bypass Response Content Check", description = "Allows bypassing the response content check", defaultValue = "false", scope = PropertyScope.Instance)
     boolean bypassResponseContent = false
 
-    @PluginProperty(title="Expected Response",description = "The expected result from the endpoint")
+    @PluginProperty(title="Expected Response",description = "The expected result from the endpoint", scope = PropertyScope.Instance)
     @TextArea
     String expectedResponse
 
-    @PluginProperty(title="JQ json verification expression",description = "Verify the response with a JQ expression, if the response is json.")
+    @PluginProperty(title="JQ json verification expression",description = "Verify the response with a JQ expression, if the response is json.", scope = PropertyScope.Instance)
     String jqExpression
 
-    @PluginProperty(title="Expected Headers",description = "Expected response headers")
+    @PluginProperty(title="Expected Headers",description = "Expected response headers", scope = PropertyScope.Instance)
     @TextArea
     String expectedHeaders
 
-    @PluginProperty(title="Expected Status Code",description = "Expected status code",defaultValue = "200")
+    @PluginProperty(title="Expected Status Code",description = "Expected status code",defaultValue = "200", scope = PropertyScope.Instance)
     long expectedCode
 
-    @PluginProperty(title="Timeout",description = "Timeout in seconds to wait for endpoint to respond",defaultValue = "30")
+    @PluginProperty(title="Timeout",description = "Timeout in seconds to wait for endpoint to respond",defaultValue = "30", scope = PropertyScope.Instance)
     long timeout
 
-    @PluginProperty(title="Log Response", description = "Logs the response", defaultValue = "false")
+    @PluginProperty(title="Log Response", description = "Logs the response", defaultValue = "false", scope = PropertyScope.Instance)
     boolean logResponse = false
 
     static final ObjectMapper mapper = new ObjectMapper()
@@ -114,12 +119,18 @@ public class ApiTester implements NodeStepPlugin {
                   rqBody = RequestBody.create(ctype, requestPayload.bytes)
               }
 
-              def rqBuilder = new Request.Builder().url(endpoint)
+
+              String replacedEndpoint = DataContextUtils.replaceDataReferences(endpoint,context.dataContext)
+              def rqBuilder = new Request.Builder().url(replacedEndpoint)
 
               def rqHdrs = convertHeaderString(requestHeaders)
               rqHdrs.each { header, value ->
-                  rqBuilder.header(header, value)
-                  logger.log(3,"Adding header: ${header}:${value}")
+                  String replacedHeader = DataContextUtils.replaceDataReferences(
+                          value,
+                          context.dataContext
+                  )
+                  rqBuilder.header(header, replacedHeader)
+                  logger.log(3,"Adding header: ${header}:${replacedHeader}")
               }
 
               rqBuilder.method(method.name(), rqBody)
