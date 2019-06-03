@@ -59,6 +59,10 @@ public class ApiTester implements NodeStepPlugin {
     @PluginProperty(title="Bypass Response Content Check", description = "Allows bypassing the response content check", defaultValue = "false", scope = PropertyScope.Instance)
     boolean bypassResponseContent = false
 
+    @PluginProperty(title="Response Check Type",description = "Type of check to execute on the response", scope = PropertyScope.Instance)
+    @SelectValues(freeSelect = false, values = ["Contains","Equals"])
+    String responseConditionCheck
+
     @PluginProperty(title="Expected Response",description = "The expected result from the endpoint", scope = PropertyScope.Instance)
     @TextArea
     String expectedResponse
@@ -157,20 +161,29 @@ public class ApiTester implements NodeStepPlugin {
               String response = okRsp.body().string()
               if(!bypassResponseContent) {
                   if(expectedResponse) {
-                      try {
-                          assert expectedResponse == response
-                      } catch (PowerAssertionError err) {
-                          out.append(err.toString())
-                          int elen = expectedResponse?.length() ?: 0
-                          int rlen = response.length()
-                          if (rlen != elen)
-                              out.append("Expected response to be: ${elen} characters. Was: ${rlen}\n")
-                          if (rlen > elen) {
-                              def range = elen..(rlen - 1)
-                              out.append("Extra characters: ${StringEscapeUtils.escapeJava(response[range])}\n")
+                      if(responseConditionCheck == "Equals") {
+                          try {
+                              assert expectedResponse == response
+                          } catch (PowerAssertionError err) {
+                              out.append(err.toString())
+                              int elen = expectedResponse?.length() ?: 0
+                              int rlen = response.length()
+                              if (rlen != elen)
+                                  out.append("Expected response to be: ${elen} characters. Was: ${rlen}\n")
+                              if (rlen > elen) {
+                                  def range = elen..(rlen - 1)
+                                  out.append("Extra characters: ${StringEscapeUtils.escapeJava(response[range])}\n")
+                              }
+                              if (expectedResponse) appendFirstStringDifference(out, expectedResponse, response)
+                              failed = true
                           }
-                          if (expectedResponse) appendFirstStringDifference(out, expectedResponse, response)
-                          failed = true
+                      } else if(responseConditionCheck == "Contains") {
+                          try {
+                              assert response.contains(expectedResponse)
+                          } catch (PowerAssertionError err) {
+                              out.append(err.toString())
+                              failed = true
+                          }
                       }
                   }
                   if(jqExpression) {
